@@ -6,12 +6,15 @@ from urllib.parse import urljoin
 class CantFoundSegmentException(Exception):
     pass
 
+class RequestErrorException(Exception):
+    pass
 
 class MyTargetClient:
     LIMIT = '500'
     LEFT = 365
     RIGHT = 0
-
+    BAD = 0
+    
     def __init__(self, username, password):
         self.main_url = 'https://target.my.com/'
         self.session = requests.Session()
@@ -99,16 +102,19 @@ class MyTargetClient:
             }],
             'logicType': 'or',
         }
-
-        return self._request(
+        response = self._request(
             method='POST',
             location='api/v2/remarketing/segments.json',
             params=url_params,
             data=json.dumps(data),
             headers=header)
 
-    def __get_segment_id(self, name=None):
-        """Возвращает id сегмента, иначе Exception"""
+        if response.status_code != 200:
+            raise RequestErrorException(f'Неверный код {response.status_code} {response.reason}')
+        return response
+
+    def _get_segment_id(self, name=None):
+        """Возвращает id сегмента, иначе 0"""
         headers = {
             'Content-Type': 'application/json',
             'X-CSRFToken': self.csrf_token
@@ -123,32 +129,31 @@ class MyTargetClient:
             headers=headers,
             json=True
         )['items']
-        if name is None:
-            return segments[-1]['id']
-        else:
-            for segment in segments:
-                if segment['name'] == name:
-                    return segment['id']
-            raise CantFoundSegmentException()
+        segment_id = self.BAD
+        for segment in segments:
+            if segment['name'] == name:
+                segment_id = segment['id']
+        return segment_id
 
     def delete_segment(self, name):
-        """Удаляет сегмент и возвращает код ответа, иначе Exception"""
+        """Удаляет сегмент и возвращает код ответа, иначе 0"""
         headers = {
             'Content-Type': 'application/json',
             'X-CSRFToken': self.csrf_token
         }
-        id = self.__get_segment_id(name)
-        return self._request(
+        id = self._get_segment_id(name)
+        response = self._request(
             method='DELETE',
             location=f'api/v2/remarketing/segments/{id}.json',
             headers=headers)
+        if response.status_code != 204:
+            raise RequestErrorException(f'Неверный код {response.status_code} {response.reason}')
+        return response
 
-    def check_segment(self, name):
-        try:
-            self.__get_segment_id(name)
-            return True
-        except CantFoundSegmentException:
-            return False
+
+    def check_segment_exists(self, name):
+            check = self._get_segment_id(name)
+            return check
 
     def create_campaign(self, name):
         """Создает кампанию с именем name"""
@@ -177,12 +182,15 @@ class MyTargetClient:
             'logicType': 'or',
         }
 
-        return self._request(
+        response = self._request(
             method='POST',
             location='api/v2/campaign_rules.json',
             params=url_params,
             data=json.dumps(data),
             headers=header)
+        if response.status_code != 204:
+            raise RequestErrorException(f'Неверный код {response.status_code} {response.reason}')
+        return response
 
     def delete_campaign(self, name):
         """Удаляет кампанию"""
@@ -190,21 +198,24 @@ class MyTargetClient:
             'Content-Type': 'application/json',
             'X-CSRFToken': self.csrf_token
         }
-        id = self.__get_segment_id(name)
-        return self._request(
+        id = self._get_segment_id(name)
+        response = self._request(
             method='DELETE',
             location=f'api/v2/campaign_rules{id}.json',
             headers=headers)
+        if response.status_code != 204:
+            raise RequestErrorException(f'Неверный код {response.status_code} {response.reason}')
+        return response
 
     def check_campaign(self, name):
         try:
-            self.__get_campaign_id(name)
+            self._get_campaign_id(name)
             return True
         except CantFoundSegmentException:
             return False
 
-    def __get_campaign_id(self, name=None):
-        """Возвращает id сегмента, иначе Exception"""
+    def _get_campaign_id(self, name=None):
+        """Возвращает id каспании, иначе 0"""
         headers = {
             'Content-Type': 'application/json',
             'X-CSRFToken': self.csrf_token
@@ -219,10 +230,8 @@ class MyTargetClient:
             headers=headers,
             json=True
         )['items']
-        if name is None:
-            return campaigns[-1]['id']
-        else:
-            for campaign in campaigns:
-                if campaign['name'] == name:
-                    return campaign['id']
-            raise CantFoundSegmentException()
+        campaign_id = self.BAD
+        for campaign in campaigns:
+            if campaign['name'] == name:
+                campaign_id = campaign['id']
+        return campaign_id

@@ -14,23 +14,23 @@ class TestTargetApi(BaseCase):
     def test_create_segment(self, generate_random_string):
         """Тест на создание сегмента"""
         name = generate_random_string
-        assert self.target_client.create_segment(name).status_code == 200
-        assert self.target_client.check_segment(name)
+        assert self.target_client.create_segment(name)
+        assert self.target_client.check_segment_exists(name)
 
     @pytest.mark.API
     def test_delete_segment(self, generate_random_string):
         """Тест на удаление сегмента"""
         name = generate_random_string
-        assert self.target_client.create_segment(name).status_code == 200
-        assert self.target_client.delete_segment(name).status_code == 204
+        assert self.target_client.create_segment(name)
+        assert self.target_client.delete_segment(name)
         with pytest.raises(AssertionError):
-            assert self.target_client.check_segment(name)
+            assert self.target_client.check_segment_exists(name)
 
     @pytest.mark.API
     def test_create_campaign(self, generate_random_string):
         """Тест на создание кампании"""
         name = generate_random_string
-        assert self.target_client.create_campaign(name).status_code == 200
+        assert self.target_client.create_campaign(name)
         assert self.target_client.check_campaign(name)
-        assert self.target_client.delete_campaign(name).status_code == 204
+        assert self.target_client.delete_campaign(name)
 
